@@ -1,0 +1,59 @@
+{
+    "video_file": "LD-diet_agesync_9-18-25-rep6_Camera0_20250924_124210_0-215999.mp4",
+    "boxes": [
+        {
+            "label": 1,
+            "x_min": 58,
+            "y_min": 183,
+            "x_max": 355,
+            "y_max": 1396,
+            "width": 297,
+            "height": 1213
+        },
+        {
+            "label": 2,
+            "x_min": 372,
+            "y_min": 179,
+            "x_max": 689,
+            "y_max": 1394,
+            "width": 317,
+            "height": 1215
+        },
+        {
+            "label": 3,
+            "x_min": 713,
+            "y_min": 172,
+            "x_max": 1010,
+            "y_max": 1417,
+            "width": 297,
+            "height": 1245
+        },
+        {
+            "label": 4,
+            "x_min": 1027,
+            "y_min": 164,
+            "x_max": 1341,
+            "y_max": 1410,
+            "width": 314,
+            "height": 1246
+        },
+        {
+            "label": 5,
+            "x_min": 1362,
+            "y_min": 159,
+            "x_max": 1664,
+            "y_max": 1405,
+            "width": 302,
+            "height": 1246
+        },
+        {
+            "label": 6,
+            "x_min": 1698,
+            "y_min": 155,
+            "x_max": 1995,
+            "y_max": 1415,
+            "width": 297,
+            "height": 1260
+        }
+    ]
+}

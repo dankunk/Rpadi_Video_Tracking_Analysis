@@ -1,0 +1,59 @@
+{
+    "video_file": "DD_diet_agesync_10-23-25-rep2_Camera0_20251029_125846_0-215999.mp4",
+    "boxes": [
+        {
+            "label": 1,
+            "x_min": 63,
+            "y_min": 154,
+            "x_max": 350,
+            "y_max": 1391,
+            "width": 287,
+            "height": 1237
+        },
+        {
+            "label": 2,
+            "x_min": 370,
+            "y_min": 154,
+            "x_max": 679,
+            "y_max": 1388,
+            "width": 309,
+            "height": 1234
+        },
+        {
+            "label": 3,
+            "x_min": 700,
+            "y_min": 152,
+            "x_max": 1005,
+            "y_max": 1382,
+            "width": 305,
+            "height": 1230
+        },
+        {
+            "label": 4,
+            "x_min": 1027,
+            "y_min": 155,
+            "x_max": 1329,
+            "y_max": 1393,
+            "width": 302,
+            "height": 1238
+        },
+        {
+            "label": 5,
+            "x_min": 1352,
+            "y_min": 154,
+            "x_max": 1649,
+            "y_max": 1391,
+            "width": 297,
+            "height": 1237
+        },
+        {
+            "label": 6,
+            "x_min": 1673,
+            "y_min": 155,
+            "x_max": 1988,
+            "y_max": 1411,
+            "width": 315,
+            "height": 1256
+        }
+    ]
+}
