@@ -8,9 +8,12 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "h5py>=3.16.0",
     "matplotlib>=3.11.1",
     "opencv-python>=5.0.0.93",
     "pandas>=3.0.5",
+    "pyarrow>=25.0.0",
+    "tables>=3.11.1",
 ]
 
 [project.scripts]
