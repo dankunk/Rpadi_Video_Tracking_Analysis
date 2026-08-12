@@ -4,14 +4,18 @@ paths:
   # providing absolute path for simplicity, as our data is backed up on OneDrive but we don't want to run this pipeline on OneDrive...
   h5_root: "D:/RpadiSleapInferencePipeline_Output"
 
-  # paths to the ROI json files. These are in the ROItools repo, which is a sibling to the H5toDatabase repo. Providing absolute path as we wont be running this pipeline on OneDrive...
+  # paths to the ROI json files. These are in the ROItools repo, which is a sibling to the H5toParquet repo. Providing absolute path as we wont be running this pipeline on OneDrive...
   # if running in the Rpadi_Video_Tracking_Analysis repo, the relative path would be:
   #roi_root: "../ROItools"
   # but since we are running this on the lab server, we will use the absolute path to the ROItools repo on the lab server:
   roi_root: "C:/Users/nalamlab/OneDrive - Colostate/NIFA_PROJECT/Obj2/Rpadi_Video_Tracking_Analysis/ROItools"
 
-  # output dir will remain in the current working dir where the snakefile is executed (H5toDatabase)
+  # add abs path to mortality tsv data. Need a tsv for each rep, even if its just column headers.
+  mortality_root: "C:/Users/nalamlab/OneDrive - Colostate/NIFA_PROJECT/Obj2/Rpadi_Video_Tracking_Analysis/Diet/LD-DD_diet_mortality_BORIS/"  # Add this line for the mortality data path
+
+  # output dir will remain in the current working dir where the snakefile is executed (H5toParquet)
   output_dir: "output"
+  
 
 # Explicitly map the replicate folder to its Treatment and ROI file. Rep folders are nested in `LD-Diet` or `DD-Diet` folders.
 replicates:

@@ -9,15 +9,15 @@ wheels/
 # Virtual environments
 .venv
 
-# hide long log directories and large output directories from H5toDatabase project
-H5toDatabase/logs/*
-H5toDatabase/output/*
-# hide testing parquet files from H5toDatabase project
-H5toDatabase/*.parquet
+# hide long log directories and large output directories from H5toParquet project
+H5toParquet/logs/*
+H5toParquet/output/*
+# hide testing parquet files from H5toParquet project
+H5toParquet/*.parquet
 
 
 # also hide .snakemake except for our major snakemake logs...
 # ignore everything inside .snakemake...
-H5toDatabase/.snakemake/*
+H5toParquet/.snakemake/*
 # ...except for the snakemake logs directory!
-H5toDatabase/!.snakemake/log
+H5toParquet/!.snakemake/log

@@ -3,6 +3,8 @@
 import glob
 from pathlib import Path
 
+
+# config should be this name and in the same directory as the snakefile. can additionally specify a different config file with the --configfile option when running snakemake
 configfile: "config.yaml"
 
 # Dynamically gather all .h5 files based on the config map
@@ -11,7 +13,6 @@ def get_h5_files(wildcards):
     h5_dir = f"{config['paths']['h5_root']}/{treatment}/{wildcards.rep}"
     
     files = glob.glob(f"{h5_dir}/*.h5")
-    # print(f"DEBUG: Found {len(files)} files for {wildcards.rep}") # You can leave this in or remove it!
     return files
 
 # Generate the expected intermediate parquet file names for a specific replicate
@@ -19,23 +20,33 @@ def get_intermediate_parquets(wildcards):
     h5_files = get_h5_files(wildcards)
     basenames = [Path(f).stem for f in h5_files]
     
-    # STRICT FORWARD SLASHES - No os.path.join()
     out_dir = config["paths"]["output_dir"]
     return [f"{out_dir}/intermediate/{wildcards.rep}/{b}.parquet" for b in basenames]
 
-# Start Rules
+# Dynamically find the mortality TSV for this replicate
+def get_mortality_file(wildcards):
+    # 1. Strip the "-DD" suffix from the wildcard so it perfectly matches the TSV filename
+    base_rep = wildcards.rep.replace("-DD", "")
+    
+    # 2. Search the mortality directory using the cleaned up name
+    files = glob.glob(f"{config['paths']['mortality_root']}/*{base_rep}*mortality.tsv")
+    
+    if files:
+        return files[0]
+        
+    # 3. Failsafe: Snakemake requires an empty list `[]`, not an empty string `""`
+    return []
 
+# Start Rules
 rule all:
     input:
         expand(config["paths"]["output_dir"] + "/final/{rep}_master.parquet", rep=config["replicates"].keys())
 
 rule h5_spatial_assign:
     input:
-        # F-strings inside the lambda are safe because they evaluate after Snakemake passes the wildcards
         h5 = lambda wildcards: f"{config['paths']['h5_root']}/{config['replicates'][wildcards.rep]['treatment']}/{wildcards.rep}/{wildcards.video}.h5",
         json = lambda wildcards: f"{config['paths']['roi_root']}/{config['replicates'][wildcards.rep]['json_file']}"
     output:
-        # Standard string concat to protect the {rep} and {video} wildcard brackets
         parquet = temp(config["paths"]["output_dir"] + "/intermediate/{rep}/{video}.parquet")
     log:
         "logs/process_{rep}_{video}.log"
@@ -49,11 +60,11 @@ rule h5_spatial_assign:
 
 rule merge_replicate:
     input:
-        get_intermediate_parquets
+        parquets = get_intermediate_parquets,
+        mortality_tsv = get_mortality_file  # <-- Added as an input!
     output:
         master_parquet = config["paths"]["output_dir"] + "/final/{rep}_master.parquet"
     params:
-        # Build the string safely here using standard Python syntax
         input_dir = config["paths"]["output_dir"] + "/intermediate/{rep}"
     log:
         "logs/merge_{rep}.log"
@@ -61,5 +72,6 @@ rule merge_replicate:
         """
         python scripts/merge_replicate.py \
             --input_dir "{params.input_dir}" \
-            --master_out "{output.master_parquet}" > "{log}" 2>&1
+            --master_out "{output.master_parquet}" \
+            --mortality_tsv "{input.mortality_tsv}" > "{log}" 2>&1
         """
