@@ -2,17 +2,26 @@
 
 ## Environment
 
-In this environment we will use the default uv venv that we have been using in our analysis
+In this project directory we will use the default uv venv that we have been using in our overall video tracking analysis.
 
-Currently, we are working with on the D: drive to save space but will merge into the shared analysis directory after completion of database generation.
+Currently, we are working with on the D: drive to save space but will merge into the shared analysis directory after completion of sorted parquet file generation.
 
-Thus, keeping everything relative to this directory is imperative. Our raw data we will provide with a absolute path so that we do not need to keep it inside of our directory. For people using this code in the future, be sure to provide the correct path to the raw data which will be hosted in a separate repository due to size.
+Thus, keeping everything relative to this directory is imperative. Our raw data we will provide with a absolute path so that we do not need to keep it inside of our directory. For people using this code in the future, be sure to provide the correct path to the raw data which will be hosted in a separate repository due to its large size.
+
+For Snakemake, we are using a version that was installed as a uv tool on our system. Please see the below chunck from the inference pipeline README.
+
+```powershell
+# we installed snakemake with:
+ uv tool install snakemake
+```
+
+It is specifically the version: `snakemake v9.23.1`
 
 ## Introduction
 
-This project will entail assigning correct identities to all tracked individuals in H5 sleap files for a given video replicate (1 rep = 96 total videos/h5 files). We intentionally used sleap in inference mode without ID tracking to have better performance/speed and since we know the ROI of each individual.
+This project will entail assigning correct identities to all tracked individuals in H5 SLEAP files (generated with pandas from frame based SLEAP CSV files) for a given video replicate (1 rep = 96 total videos/h5 files). We intentionally used SLEAP in inference mode without ID tracking to have better performance/speed since we know the ROI of each individual.
 
-Additionally, since 1 replicate contains 96 sequential hours of video, we want to do this across all videos. Further, we want to concatenate all the tracking data together into a single database. This database can then be utilized for downstream locomotion and actigraphy analysis.
+Additionally, since 1 replicate contains 96 sequential hours of video, we want to do this across all 96 hours for a given video. Further, we want to concatenate all the tracking data together into a single parquet file that is sorted and ready for downstream analysis. This file can then be utilized for downstream locomotion and actigraphy analysis in python or R...
 
 ## Prototyping  
 
@@ -72,7 +81,7 @@ After we prototyped for a bit, we now have a good idea of how to run this workfl
 
 We now want to run this type of an analysis on all of our 16 reps (8 in LD and 8 in DD conditions). Since this is a lot of processing, we want to use snakemake to manage all of this for obvious reasons.
 
-While we will build this snakemake workflow inside of this directory in OneDrive. We will move it onto our C: or D: drive when its time to run. We can still point to our uv venv by activating the env that we currently have in our OneDrive folder. 
+While we will build this snakemake workflow inside of this directory in OneDrive. We will move it onto our C: or D: drive when its time to run. We can still point to our uv venv by activating the env that we currently have in our OneDrive folder. Additionally, we can utilize the Snakemake version installed via uv tool mentioned above.
 
 Additionally, we can point to all of our data directories with hard coded paths in the config. To re-do this on another machine or directory, just change those paths to where the data lives...
 
@@ -126,17 +135,17 @@ Once finished we can copy this directory back into OneDrive for git tracking in 
 ## Output
 The final output of our pipeline here should be 1 master parquet file for each 96 h video. This parquet has the following column structure...
 
-`frame_idx` - per hour frame for that chunk
-`x` - x position
-`y` - y position
-`score` - prediction score
-`individual` - 1 through 6
-`video_id` - string with video filename
-`treatment` - LD or DD
-`replicate` - video rep number
-`global_frame` - global 96h frame count
-`elapsed_hours` - hours elapsed --> Update: dropped
-`ZT_time` - ZT time, 0ZT = 8am --> Update: dropped
+- `frame_idx` - per hour frame for that chunk --> Update: dropped, keeping only `global_frame`
+- `x` - x position
+- `y` - y position
+- `score` - prediction score
+- `individual` - 1 through 6
+- `video_id` - string with video filename
+- `treatment` - LD or DD
+- `replicate` - video rep number
+- `global_frame` - global 96h frame count
+- `elapsed_hours` - hours elapsed --> Update: dropped
+- `ZT_time` - ZT time, 0ZT = 8am --> Update: dropped
 
 TODO: We should drop the precision and round in the score and possibly the elapsed_hours and ZT_time columns to save space. We def don't need that much precision.
 
