@@ -16,6 +16,8 @@ dependencies = [
     "pyarrow>=25.0.0",
     "scipy>=1.18.0",
     "seaborn>=0.13.2",
+    "sleap-io>=0.7.1",
+    "sleap[io,nn]>=1.6.3",
     "tables>=3.11.1",
 ]
 
