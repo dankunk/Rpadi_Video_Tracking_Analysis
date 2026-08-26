@@ -89,7 +89,7 @@ def process_single_file(file_path, fps, jitter_thresh, max_jump, bout_thresh):
 def main():
     parser = argparse.ArgumentParser(description="Generate filtered, 1-minute activity bins (Distance travelled) per invididual.")
     parser.add_argument("--input_dir", required=True, help = "Input directory.") # dir containing all parquet files per video (1 file for all 96 hour based chunks)
-    parser.add_argument("--out_file", required=True, help= "Output directory") # output file for the sorted, timestamped in ZT time, and filtered, minute by minute data.
+    parser.add_argument("--out_file", required=True, help= "Output directory and file name csv") # output file for the sorted, timestamped in ZT time, and filtered, minute by minute data.
     parser.add_argument("--fps", type=int, default=60, help = "Framerate of video data.") # specify framerate, for our aphid data its always 60
     parser.add_argument("--jitter", type=float, default=3.0, help="Min px/frame. Resonable ranges are anywhere from 1.0 to 3.0. See SLEAP model evals for a good idea of model error/jitter...") # jitter pixel filter, # of pixels
     parser.add_argument("--max_jump", type=float, default=50.0, help="Max px/frame to clear teleportation.") # big jumps pixel filter, # of pixels.
