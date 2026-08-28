@@ -28,6 +28,67 @@ python ./plot_activity_qc.py --csv_in ".\diet_1min_activity.csv" --out_dir ".\QC
 
 These plots are then generated in the output directory specified (`QC_Plots`), we additionally pass the conversion from pixels to cm.
 
+# Adjusting Filtering
+
+We can additionally play around with some of these filters to see what works best...
+
+```powershell
+
+python generate_activity_bins.py --input_dir ../H5toParquet/output/final/ --out_file ./diet_1min_activity_5jitter_50jump_76bout.csv --cores 8 --jitter 5
+
+
+python .\plot_activity_qc.py --csv_in .\diet_1min_activity_5jitter_50jump_76bout.csv --out_dir ./QC_Plots_5jitter
+
+Loading data from .\diet_1min_activity_5jitter_50jump_76bout.csv...
+
+--- DATA SANITY CHECKS ---
+Maximum distance moved in a single minute: 17.22 cm
+✅ Max distance looks biologically feasible. But be sure to double check the QC plots.
+Global Activity Level: Aphids were moving 50.5% of the time.
+--------------------------
+
+Generating Distance Histogram...
+Generating Faceted Timeline...
+Generating Coverage Histogram...
+Generating Unbinned 1-Minute Impulse Actogram Grid...
+Generating Unbinned 1-Minute Filled Step Actogram Grid...
+Success! QC plots saved to: ./QC_Plots_5jitter
+```
+
+
+Additionally, we may want to downsample our video. Since the original video was 60 fps and we inferenced at 60 fps a lot of that noise is comping just because our sampling is such high resolution Because we know that aphid movement isnt on that scale we can downsample and still get good tracking data with less noise. We can start with 30 FPS but can even go down as small as 15 fps... In this new script `generate_activity_bins_FPSdownsample_rollingMean.py` we do all the same things as before except now we additionally downsample and apply a rolling mean filter... We want to run this with less cores since it will now likely use a bit more system resources applying the filter.
+
+Here we specify the original FPS (60) and the target FPS after downsampling. Additionally, we provide the length of the smoothing window in pixels and the same filters as before. Its wise to reduce the number of cores since we are now using a lot more memory with the smoothing window filter.
+
+```powershell
+python generate_activity_bins_FPSdownsample_rollingMean.py --input_dir "../H5toParquet/output/final/" --out_file "./diet_1min_activity_downsample_rollingMean.csv" --orig_fps 60 --target_fps 30 --smooth_window 5 --jitter 5.0 --max_jump 50.0 --bout 76.0 --cores 2
+
+# runs in less than 5 minutes with cores = 2. Could probably go up to 4 (32 GB ram on my home machine).
+
+# now running same qc plots as before...
+
+python .\plot_activity_qc.py --csv_in .\diet_1min_activity_downsample_rollingMean.csv --out_dir ./QC_Plots_downsample_rollingMean
+
+Loading data from .\diet_1min_activity_downsample_rollingMean.csv...
+
+--- DATA SANITY CHECKS ---
+Maximum distance moved in a single minute: 16.55 cm
+✅ Max distance looks biologically feasible. But be sure to double check the QC plots.
+Global Activity Level: Aphids were moving 44.6% of the time.
+--------------------------
+
+Generating Distance Histogram...
+Generating Faceted Timeline...
+Generating Coverage Histogram...
+Generating Unbinned 1-Minute Impulse Actogram Grid...
+Generating Unbinned 1-Minute Filled Step Actogram Grid...
+Success! QC plots saved to: ./QC_Plots_downsample_rollingMean
+
+```
+
+
+
+# Rhythmicity Modelling
 We should probably mull around in these results and qc them for a bit. but once we feel good about the data we can take these exact signals and do LS on them to see if their periodic.
 
 ```powershell

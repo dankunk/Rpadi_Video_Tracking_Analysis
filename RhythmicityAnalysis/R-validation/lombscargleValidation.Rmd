@@ -1,0 +1,317 @@
+---
+title: "lombscargleValidation"
+output: html_document
+---
+
+# Validating Lomb-Scargle Results in R
+
+First lets load in our data and grab out one individual to start just to see how lsp works
+
+```{r}
+library(readr)
+library(dplyr)
+library(lomb)
+library(ggplot2)
+```
+
+```{r}
+
+# 1. Import the dataset
+csv_path = "../../GenerateActivityBins/diet_1min_activity_downsample_rollingMean.csv"
+df = read_csv(csv_path)
+
+# Isolate a single rhythmic individual for the cross-check
+# Update the treatment/replicate/individual to match one you want to verify
+target_ind = df %>% 
+  filter(treatment == "DD-diet", replicate == "rep1", individual == 1) #%>%
+  #arrange(ZT_continuous)
+```
+
+```{r}
+# quick plot of this individuals activity
+
+
+# Create a dataframe for the dark phase (night) shading
+# Starts at ZT 16, ends at ZT 24, repeating every 24 hours up to ~100h
+night_bars <- data.frame(
+  xmin = seq(16, 100, by = 24),
+  xmax = seq(24, 108, by = 24)
+)
+
+# QC Plot: Raw activity profile over the entire 96-hour experiment
+qc_plot <- ggplot(target_ind, aes(x = ZT_continuous, y = filtered_distance / 281)) +
+  # 1. Add the gray background bars FIRST so they sit behind the data
+  geom_rect(data = night_bars, inherit.aes = FALSE,
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "grey40", alpha = 0.25) +
+            
+  # 2. Add the activity data on top
+  geom_area(fill = "dodgerblue4", alpha = 0.6) +
+  geom_line(color = "dodgerblue4", linewidth = 0.5) +
+  
+  theme_classic() +
+  scale_x_continuous(breaks = seq(0, 100, by = 12), expand = c(0, 0)) +
+  labs(
+    title = "QC: Continuous Activity Profile (Rep 1, Ind 1)",
+    x = "Zeitgeber Time (Hours)",
+    y = "Filtered Distance"
+  ) +
+  theme(
+    axis.text = element_text(color = "black", size = 10, face = "bold"),
+    axis.title = element_text(size = 11, face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+
+print(qc_plot)
+```
+
+```{r}
+# The lomb::lsp function accepts a 2-column dataframe: [Time, Observation]
+ls_data = target_ind %>% select(ZT_continuous, filtered_distance)
+
+# Run the periodogram bounded between 20 and 28 hours
+# alpha = 0.05 automatically calculates and draws the FAP threshold line
+ls_result = lsp(ls_data, 
+                 from = 2, 
+                 to = 96, 
+                 type = "period", 
+                 alpha = 0.05, 
+                 plot = F,
+                 main = "R lomb::lsp() Verification (20-28h)",
+                 ofac = 50)
+
+
+
+# 2. Extract the math into a clean dataframe
+periodogram_df = data.frame(
+  Period = ls_result$scanned,
+  Power = ls_result$power
+)
+
+# Extract the FAP threshold (the red dashed line)
+fap_threshold <- ls_result$sig.level
+
+# Print exact statistical outputs to compare with Python
+cat("Peak Period (h):", ls_result$peak.at[1], "\n")
+cat("Peak Power:", ls_result$peak, "\n")
+cat("p-value:", ls_result$p.value, "\n")
+
+# 3. Plot manually using ggplot2
+ggplot(periodogram_df, aes(x = Period, y = Power)) +
+  geom_line(color = "black", linewidth = 1) +
+  geom_hline(yintercept = fap_threshold, color = "red", linetype = "dashed", linewidth = 1) +
+  # Add a gold star at the peak
+  annotate("point", x = ls_result$peak.at[1], y = ls_result$peak, 
+           color = "gold", size = 5, shape = 21, fill = "gold", stroke = 1) +
+  annotate("text", x = ls_result$peak.at[1] + 0.3, y = ls_result$peak, 
+           label = paste0(round(ls_result$peak.at[1], 1), "h"), fontface = "bold") +
+  theme_classic() +
+  labs(
+    title = paste("R Lomb-Scargle Verification: Rep 1, Ind 1"),
+    x = "Period (Hours)",
+    y = "Scargle Power"
+  ) +
+  # Lock the x-axis to exactly 20-28h so it visually matches your Python plots
+  coord_cartesian(xlim = c(0, 96)) +
+  theme(
+    axis.text = element_text(color = "black", size = 11, face = "bold"),
+    axis.title = element_text(size = 13, face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+
+```
+
+# Scaling to All Individuals
+
+```{r}
+# 4. Define function to extract rhythmicity stats and calculate Acrophase
+extract_rhythm_stats <- function(df_subset, keys) {
+  ls_data <- df_subset %>% select(ZT_continuous, filtered_distance)
+  
+  # Run high-resolution LSP
+  ls_result <- lsp(ls_data, from = 16, to = 32, type = "period", 
+                   ofac = 50, alpha = 0.05, plot = FALSE)
+  
+  peak_period <- ls_result$peak.at[1]
+  peak_power <- ls_result$peak
+  fap_threshold <- ls_result$sig.level
+  
+  # Evaluate significance
+  is_rhythmic <- peak_power >= fap_threshold
+  
+  acrophase_zt <- NA
+  active_phase <- NA
+  
+  # If rhythmic, use Harmonic Regression (Cosinor) to find the acrophase
+  if (is_rhythmic) {
+    t <- ls_data$ZT_continuous
+    y <- ls_data$filtered_distance
+    
+    # Fit cosine and sine waves fixed at the winning period
+    cos_term <- cos(2 * pi * t / peak_period)
+    sin_term <- sin(2 * pi * t / peak_period)
+    fit <- lm(y ~ cos_term + sin_term)
+    
+    # Extract coefficients
+    beta1 <- coef(fit)["cos_term"]
+    beta2 <- coef(fit)["sin_term"]
+    
+    # Calculate phase angle in radians and ensure it is positive
+    phase_rad <- atan2(beta2, beta1)
+    if (phase_rad < 0) {
+      phase_rad <- phase_rad + 2 * pi
+    }
+    
+    # Convert radians to hours relative to t=0, then map to 24h ZT scale
+    acrophase_hours <- phase_rad * (peak_period / (2 * pi))
+    acrophase_zt <- acrophase_hours %% 24
+    
+    # Categorize peak timing (Day = ZT 0-16, Night = ZT 16-24)
+    active_phase <- ifelse(acrophase_zt < 16, "Day", "Night")
+  }
+  
+  # Return a clean 1-row summary for this individual
+  data.frame(
+    Peak_Period = peak_period,
+    Peak_Power = peak_power,
+    FAP_Threshold = fap_threshold,
+    Is_Rhythmic = is_rhythmic,
+    Acrophase_ZT = acrophase_zt,
+    Peak_Activity_Window = active_phase
+  )
+}
+
+cat("Extracting significant periods and mapping acrophases...\n")
+
+# 5. Apply across the full dataset
+rhythm_summary_df <- df %>%
+  group_by(treatment, replicate, individual) %>%
+  filter((max(ZT_continuous) - min(ZT_continuous)) >= 48.0) %>%
+  group_modify(~ extract_rhythm_stats(.x, .y)) %>%
+  ungroup()
+
+# View the extracted data
+head(rhythm_summary_df)
+
+# 6. Isolate just the peak stats so we don't overplot stars/text 1000 times per facet
+peak_stats <- all_lomb_data %>%
+  distinct(treatment, replicate, individual, Peak_Period, Peak_Power, FAP_Threshold)
+
+cat("Done! Successfully extracted periodograms for", nrow(peak_stats), "individuals.\n")
+```
+
+```{r}
+# 7. Generate the Faceted Matrix Plot in ggplot2
+
+# Define the exact colors used in your Python script
+treat_colors <- c("LD-diet" = "#EE99AA", "DD-diet" = "#994455")
+
+ggplot(all_lomb_data, aes(x = Period, y = Power)) +
+  # Main periodogram curve colored by treatment
+  geom_line(aes(color = treatment), linewidth = 0.8) +
+  
+  # The FAP p=0.05 threshold dashed line
+  geom_hline(data = peak_stats, aes(yintercept = FAP_Threshold), 
+             color = "red", linetype = "dashed", linewidth = 0.6, alpha = 0.8) +
+  
+  # The peak marker (using a filled circle with a white outline to match Python)
+  geom_point(data = peak_stats, aes(x = Peak_Period, y = Peak_Power, fill = treatment), 
+             shape = 21, size = 3, color = "white", stroke = 0.5) +
+  
+  # The peak period text label (hjust = 0 keeps it from overlapping the dot)
+  geom_text(data = peak_stats, aes(x = Peak_Period + 0.3, y = Peak_Power + 0.002, 
+                                   label = paste0(round(Peak_Period, 1), "h"), 
+                                   color = treatment), 
+            size = 3.5, fontface = "bold", hjust = 0) +
+  
+  # Create the matrix grid: Rows = Replicates, Columns = Individuals
+  facet_grid(replicate ~ individual) +
+  
+  # Formatting constraints
+  scale_color_manual(values = treat_colors) +
+  scale_fill_manual(values = treat_colors) +
+  coord_cartesian(xlim = c(14, 34)) + # Lock visual window to target circadian range
+  theme_bw() +
+  labs(
+    #title = "R Lomb-Scargle Matrix (20-28h Search Window)",
+    x = "Period (Hours)",
+    y = "Scargle Power"
+  ) +
+  theme(
+    strip.background = element_rect(fill = "grey90", color = "black"),
+    strip.text = element_text(face = "bold", size = 11),
+    axis.text = element_text(color = "black"),
+    panel.grid.minor = element_blank(),
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+
+```
+
+
+
+```{r}
+#Filter the summary dataframe to only include significant rhythms
+rhythmic_only <- rhythm_summary_df %>% filter(Is_Rhythmic == TRUE)
+
+#Define exact colors
+treat_colors <- c("LD-diet" = "#EE99AA", "DD-diet" = "#994455")
+
+#1. Acrophase Boxplot
+acrophase_box <- ggplot(rhythmic_only, aes(x = treatment, y = Acrophase_ZT)) +
+
+#Add the gray background bar for the night phase (ZT 16-24) on the y-axis
+annotate("rect", ymin = 16, ymax = 24, xmin = -Inf, xmax = Inf,
+fill = "grey40", alpha = 0.2) +
+
+#Add jittered points in the background
+geom_jitter(width = 0.15, alpha = 0.3, size = 2, color = "black") +
+
+#Add boxplots on top
+geom_boxplot(aes(fill = treatment), width = 0.4, alpha = 0.8,
+outlier.shape = NA, linewidth = 0.8, color = "black") +
+scale_fill_manual(values = treat_colors) +
+scale_x_discrete(labels = c("LD-diet" = "LD", "DD-diet" = "DD")) +
+scale_y_continuous(breaks = seq(0, 24, by = 4), limits = c(0, 24), expand = c(0, 0)) +
+theme_classic() +
+labs(
+title = "Acrophase of Significant Rhythms",
+x = "Treatment",
+y = "Acrophase (ZT Hours)"
+) +
+theme(
+axis.text = element_text(color = "black", size = 11, face = "bold"),
+axis.title = element_text(size = 13, face = "bold"),
+plot.title = element_text(face = "bold"),
+legend.position = "none" # Hide legend since x-axis has the labels
+)
+
+print(acrophase_box)
+
+#2. Peak Period Boxplot
+period_box <- ggplot(rhythmic_only, aes(x = treatment, y = Peak_Period)) +
+
+#Add jittered points in the background
+geom_jitter(width = 0.15, alpha = 0.3, size = 2, color = "black") +
+
+#Add boxplots on top
+geom_boxplot(aes(fill = treatment), width = 0.4, alpha = 0.8,
+outlier.shape = NA, linewidth = 0.8, color = "black") +
+scale_fill_manual(values = treat_colors) +
+scale_x_discrete(labels = c("LD-diet" = "LD", "DD-diet" = "DD")) +
+scale_y_continuous(breaks = seq(16, 32, by = 2), limits = c(15.5, 32.5), expand = c(0, 0)) +
+theme_classic() +
+labs(
+title = "Circadian Period of Significant Rhythms",
+x = "Treatment",
+y = "Peak Period (Hours)"
+) +
+theme(
+axis.text = element_text(color = "black", size = 11, face = "bold"),
+axis.title = element_text(size = 13, face = "bold"),
+plot.title = element_text(face = "bold"),
+legend.position = "none" # Hide legend since x-axis has the labels
+)
+
+print(period_box)
+```
