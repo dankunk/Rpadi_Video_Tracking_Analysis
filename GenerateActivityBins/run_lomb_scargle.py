@@ -1,6 +1,7 @@
 # run_lomb_scargle.py
 # in this script we will play around with running LS using the astropy functions and plotting said results...
 # we are running LS with a false alarm probability to generate some p-values.
+# note this is not the final rhythmicity analysis, just testing.... Please see the `RhythmicityAnalysis` directory for the final analysis 
 
 import argparse
 import pandas as pd
