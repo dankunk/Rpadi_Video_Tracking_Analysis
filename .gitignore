@@ -9,21 +9,35 @@ wheels/
 # Virtual environments
 .venv
 
+# H5toParquet
 # hide long log directories and large output directories from H5toParquet project
 H5toParquet/logs/*
-H5toParquet/output/*
+H5toParquet/output/* 
+# the above data is important and should be uploaded to a repo such as zenodo.
 # hide testing parquet files from H5toParquet project
 H5toParquet/*.parquet
-
-
 # also hide .snakemake except for our major snakemake logs...
 # ignore everything inside .snakemake...
 H5toParquet/.snakemake/*
-
 # ...except for the snakemake logs directory!
 H5toParquet/!.snakemake/log
 .Rproj.user
 
+# GenerateActivityBins
+# hide old output data from tracking. we only want to track our final csvs and qc plots
+# hide initial LS test, only keep final LS test
+GenerateActivityBins/ls_test/*
+GenerateActivityBins/ls_test_5jitter/*
+# hide intitial QC plots, only keep final.
+GenerateActivityBins/QC_Plots/*
+GenerateActivityBins/QC_Plots_5jitter/*
+# hide initial csvs, only keep final.
+GenerateActivityBins/diet_1min_activity.csv
+GenerateActivityBins/diet_1min_activity_5jitter_50jump_76bout.csv
+
+
+
+# RhythmicityAnalysis
 # hide R crud in our Rhy. validation 
 .Rhistory
 .Rprofile

@@ -112,6 +112,8 @@ We are using the `plot_mortality.ipynb` and providing the appropriate paths to o
 # Final Analysis
 
 The script used for the final video tracking analysis (diet) is `generate_activity_bins_FPSdownsample_rollingMean.py`. This script was run with the following options as shown above.
+Its important to note that our data is now in 30 FPS.
+i
 
 ```powershell
 python generate_activity_bins_FPSdownsample_rollingMean.py --input_dir "../H5toParquet/output/final/" --out_file "./diet_1min_activity_downsample_rollingMean.csv" --orig_fps 60 --target_fps 30 --smooth_window 5 --jitter 5.0 --max_jump 50.0 --bout 76.0 --cores 2
