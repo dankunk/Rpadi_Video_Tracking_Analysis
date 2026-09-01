@@ -19,5 +19,11 @@ H5toParquet/*.parquet
 # also hide .snakemake except for our major snakemake logs...
 # ignore everything inside .snakemake...
 H5toParquet/.snakemake/*
+
 # ...except for the snakemake logs directory!
 H5toParquet/!.snakemake/log
+.Rproj.user
+
+# hide R crud in our Rhy. validation 
+.Rhistory
+.Rprofile
