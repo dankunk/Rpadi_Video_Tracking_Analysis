@@ -1,6 +1,6 @@
 # generate_activity_bins_FPSdownsample_rollingMean.py
 # In this script we also downsample the data to 30 fps to further reduce high frequency noise... We also add a smoothing filter with rolling means... 
-# We probably want this to run with fewer cores. 
+# We probably want this to run with fewer cores as now its a bit more compute intensive. 
 
 import argparse
 import glob

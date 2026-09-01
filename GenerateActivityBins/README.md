@@ -10,17 +10,21 @@ To run the script we will first activate our `rpadi-video-tracking-analysis` ven
 . "C:\Users\nalamlab\OneDrive - Colostate\NIFA_PROJECT\Obj2\Rpadi_Video_Tracking_Analysis\.venv\Scripts\activate.ps1"
 ```
 
-Next we can run this script with the following command line arguments as the script entails:
+Note that the location of this environment will change depending on your computer. You can create the same venv we are using here by grabbing the uv.lock and using uv sync.
 
+More Information on this process can be found here. https://docs.astral.sh/uv/concepts/projects/sync/
+
+
+##
+
+Next we can run our script with the following command line arguments as the script entails:
 
 
 ```powershell
 python ./generate_activity_bins.py --input_dir "..\H5toParquet\output\final" --out_file ".\diet_1min_activity.csv" --fps 60 --jitter 3.0 --max_jump 50 --bout 76.0 --cores 16 # --> conservative at first...
 ```
 
-
 After running the script we can qc the data and see if it looks ok...
-
 
 ```powershell
 python ./plot_activity_qc.py --csv_in ".\diet_1min_activity.csv" --out_dir ".\QC_Plots" --px_per_cm 281
@@ -33,12 +37,12 @@ These plots are then generated in the output directory specified (`QC_Plots`), w
 We can additionally play around with some of these filters to see what works best...
 
 ```powershell
-
 python generate_activity_bins.py --input_dir ../H5toParquet/output/final/ --out_file ./diet_1min_activity_5jitter_50jump_76bout.csv --cores 8 --jitter 5
 
 
 python .\plot_activity_qc.py --csv_in .\diet_1min_activity_5jitter_50jump_76bout.csv --out_dir ./QC_Plots_5jitter
-
+```
+```
 Loading data from .\diet_1min_activity_5jitter_50jump_76bout.csv...
 
 --- DATA SANITY CHECKS ---
@@ -68,7 +72,8 @@ python generate_activity_bins_FPSdownsample_rollingMean.py --input_dir "../H5toP
 # now running same qc plots as before...
 
 python .\plot_activity_qc.py --csv_in .\diet_1min_activity_downsample_rollingMean.csv --out_dir ./QC_Plots_downsample_rollingMean
-
+```
+```
 Loading data from .\diet_1min_activity_downsample_rollingMean.csv...
 
 --- DATA SANITY CHECKS ---
@@ -89,13 +94,13 @@ Success! QC plots saved to: ./QC_Plots_downsample_rollingMean
 
 
 # Rhythmicity Modelling
-We should probably mull around in these results and qc them for a bit. but once we feel good about the data we can take these exact signals and do LS on them to see if their periodic.
+We should probably mull around in these results and qc them for a bit. But once we feel good about the filtering method we can take these exact signals and do LS on them to see if they are periodic.
 
 ```powershell
 python .\run_lomb_scargle.py --csv_in ".\diet_1min_activity.csv" --outdir ".\ls_test"
 ```
 
-Again, the output for this data will be the specified directory. Read this script to understand a bit more about what we are doing. Specifically, we are running LS on each individuals locomotor signal and trying to detect periods between 16 and 32 h. We will likely use this test run to inform our final periodicity analysis.
+Again, the output for this data will be the specified directory. Read this script to understand a bit more about what we are doing. Specifically, we are running LS on each individuall' locomotor signal and trying to detect periods between 16 and 32 h. We will likely use this test run to inform our final periodicity analysis.
 
 
 ## Mortality Plots
@@ -103,3 +108,13 @@ In this directory it felt like a good idea to also generate the final mortality 
 
 We are using the `plot_mortality.ipynb` and providing the appropriate paths to our master parquets in `Rpadi_Video_Tracking_Analysis/H5toParquet/output/final/`. We additionally save the plots to svg in the `Mortality_Plots` directory in our current working directory.
 
+
+# Final Analysis
+
+The script used for the final video tracking analysis (diet) is `generate_activity_bins_FPSdownsample_rollingMean.py`. This script was run with the following options as shown above.
+
+```powershell
+python generate_activity_bins_FPSdownsample_rollingMean.py --input_dir "../H5toParquet/output/final/" --out_file "./diet_1min_activity_downsample_rollingMean.csv" --orig_fps 60 --target_fps 30 --smooth_window 5 --jitter 5.0 --max_jump 50.0 --bout 76.0 --cores 2
+
+# runs in less than 5 minutes with cores = 2. Could probably go up to 4 (32 GB ram on my machine).
+```
