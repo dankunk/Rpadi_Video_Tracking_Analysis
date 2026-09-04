@@ -1,0 +1,438 @@
+---
+title: "ActivityAnalysis"
+author: "Daniel Kunk"
+date: "`r Sys.Date()`"
+output: html_document
+---
+We can first load any global packages
+
+```{r}
+library(tidyverse)
+```
+
+Below we will load the activity CSV.
+
+Also, we will prep the dataset for use. And also set some output vars.
+
+```{r}
+# Set file path
+file_path = "../GenerateActivityBins/diet_1min_activity_downsample_rollingMean.csv"
+
+# Load and prep the analysis dataframe in a single pipeline
+df = read_csv(file_path, show_col_types = FALSE) %>%
+  mutate(
+    # Add day/night categorical labels (night is 16ZT to 0ZT, day is 0 to 16)
+    time_of_day = if_else((ZT_day %% 24) < 16, "day", "night"),
+    is_photophase = (ZT_day %% 24) < 16,
+    
+    # Add day number
+    day_num = floor(ZT_continuous / 24),
+    
+    # Convert pixels to cm (281 px/cm)
+    distance_cm = filtered_distance / 281.0,
+    
+    # Create a truly unique identifier for each animal
+    animal_id = paste(replicate, "- Ind", individual)
+  ) %>%
+  # Sort the dataframe
+  arrange(treatment, replicate, individual, ZT_continuous)
+
+
+# Set color palettes for LD and DD
+palette_dict = c("LD-diet" = "#EE99AA", "DD-diet" = "#994455")
+
+# Set and create output directories
+out_dir = "./Plots/"
+tables_dir = "./Tables/"
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(tables_dir, showWarnings = FALSE, recursive = TRUE)
+
+
+# Quickly preview the dataframe
+head(df)
+```
+
+First we will start with our modelling where we average over all 4 days.
+
+Note that we want to normalize per hour since day and night are different length. 
+
+Additionally, day 1 started recording at 4ZT so its technically only 12 hours...
+
+We need to account for that...
+
+
+```{r}
+daily_dist = df %>%
+  group_by(treatment, animal_id, day_num, is_photophase) %>%
+  summarise(
+    distance_cm = sum(distance_cm, na.rm = TRUE),
+    observed_minutes = n(), # Counts the actual number of 1-minute rows recorded
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Convert observed minutes to hours
+    duration_hours = observed_minutes / 60,
+    
+    # Normalize to a rate
+    dist_per_hour = distance_cm / duration_hours,
+    
+    # Create clean grouping variables for modeling and plotting
+    phase_label = if_else(is_photophase, "Day", "Night"),
+    group = factor(paste(treatment, phase_label, sep = "_"))
+  ) %>%
+  mutate(treatment = factor(treatment, levels = c("LD-diet", "DD-diet")))
+```
+
+Now we have things filtered we can go ahead and start modelling.
+
+```{r}
+library(glmmTMB)
+library(DHARMa)
+
+# Fit a Tweedie mixed model
+tweedie_mod = glmmTMB(
+  dist_per_hour ~ group + (1 | animal_id), 
+  data = daily_dist, 
+  family = tweedie(link = "log")
+)
+
+summary(tweedie_mod)
+
+# Simulate residuals and plot DHARMa diagnostics (QQ and Res vs Pred plots)
+res_dharma = simulateResiduals(tweedie_mod, n = 500)
+plot(res_dharma) 
+
+# Identify potential outliers mathematically
+testOutliers(res_dharma)
+
+
+
+library(emmeans)
+
+# Extract estimated marginal means on the response scale
+emm = emmeans(tweedie_mod, ~ group, type = "response")
+
+# Calculate pairwise comparisons with Tukey correction
+pw_results = pairs(emm, adjust = "tukey")
+pw_df = as.data.frame(summary(pw_results))
+
+summary(pw_results)
+
+# Save to disc
+write_csv(as.data.frame(summary(pw_results)), file.path(tables_dir, "pairwise_glmmtmb_fdr_averaged.csv"))
+```
+
+# start the ggplot
+```{r}
+library(ggplot2)
+library(stringr)
+library(ggbeeswarm)
+
+# Calculate scaling heights before building the brackets dataframe
+max_val = max(daily_dist$dist_per_hour, na.rm = TRUE)
+max_day = max(daily_dist$dist_per_hour[daily_dist$phase_label == "Day"], na.rm = TRUE)
+max_night = max(daily_dist$dist_per_hour[daily_dist$phase_label == "Night"], na.rm = TRUE)
+
+y_day   = max_day + (max_val * 0.05)
+y_night = max_night + (max_val * 0.05)
+highest_drawn_y = max(y_day, y_night)
+
+# Define the helper functions
+get_p = function(g1, g2) {
+  pattern = paste0("(", g1, ".*", g2, ")|(", g2, ".*", g1, ")")
+  match_row = pw_df %>% filter(str_detect(contrast, pattern))
+  if (nrow(match_row) > 0) return(match_row$p.value[1]) else return(1.0)
+}
+
+p_to_stars = function(p) {
+  case_when(
+    p < 0.0001 ~ "****",
+    p < 0.001  ~ "***",
+    p < 0.01   ~ "**",
+    p < 0.05   ~ "*",
+    TRUE       ~ "ns"
+  )
+}
+
+# Clean up x-axis labels for the plot
+daily_dist = daily_dist %>%
+  mutate(
+    phase_label_clean = factor(
+      phase_label, 
+      levels = c("Day", "Night"),
+      labels = c("Day /\nSubjective Day", "Night /\nSubjective Night")
+    )
+  )
+
+# Calculate bracket coordinates
+brackets = tibble(
+  comp = c("Day_LD_vs_DD", "Night_LD_vs_DD", "LD_Day_vs_Night", "DD_Day_vs_Night", "Cross_LD_Day_vs_DD_Night"),
+  # LD sits at -0.1875 (left), DD sits at +0.1875 (right)
+  xmin = c(1 - 0.1875, 2 - 0.1875, 1 - 0.1875, 1 + 0.1875, 1 - 0.1875),
+  xmax = c(1 + 0.1875, 2 + 0.1875, 2 - 0.1875, 2 + 0.1875, 2 + 0.1875),
+  y_position = c(
+    y_day, 
+    y_night, 
+    highest_drawn_y + (max_val * 0.12), 
+    highest_drawn_y + (max_val * 0.20),
+    highest_drawn_y + (max_val * 0.28)
+  ),
+  p_val = c(
+    get_p("LD-diet_Day", "DD-diet_Day"),
+    get_p("LD-diet_Night", "DD-diet_Night"),
+    get_p("LD-diet_Day", "LD-diet_Night"),
+    get_p("DD-diet_Day", "DD-diet_Night"),
+    get_p("LD-diet_Day", "DD-diet_Night") 
+  )
+) %>%
+  mutate(annotation = p_to_stars(p_val)) %>%
+  filter(annotation != "ns")
+
+# Start the final plot
+activity_plot = ggplot(daily_dist, aes(x = phase_label_clean, y = dist_per_hour, fill = treatment)) +
+  geom_boxplot(
+    width = 0.5, 
+    position = position_dodge(0.75), 
+    outlier.shape = NA, 
+    alpha = 0.7, 
+    color = "black"
+  ) +
+  geom_point(
+    aes(group = treatment), 
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.75),
+    color = "black", 
+    alpha = 0.4, 
+    size = 1.5, 
+    stroke = 0
+  ) +
+  # Use labels argument to simplify the legend output without changing your raw data
+  scale_fill_manual(
+    values = palette_dict,
+    labels = c("LD-diet" = "LD", "DD-diet" = "DD")
+  ) +
+  labs(
+    x = NULL, 
+    y = "Distance Travelled (cm / hour)", 
+    fill = NULL
+  ) +
+  #scale_y_continuous(expand = expansion(mult = c(0.02, 0.1))) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    axis.text = element_text(color = "black"),
+    axis.line = element_line(color = "black")
+  )
+
+# Draw brackets
+if (nrow(brackets) > 0) {
+  tip = max_val * 0.015 
+  
+  activity_plot = activity_plot + 
+    geom_segment(
+      data = brackets, 
+      aes(x = xmin, xend = xmax, y = y_position, yend = y_position), 
+      color = "black", inherit.aes = FALSE
+    ) +
+    geom_segment(
+      data = brackets, 
+      aes(x = xmin, xend = xmin, y = y_position, yend = y_position - tip), 
+      color = "black", inherit.aes = FALSE
+    ) +
+    geom_segment(
+      data = brackets, 
+      aes(x = xmax, xend = xmax, y = y_position, yend = y_position - tip), 
+      color = "black", inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = brackets, 
+      aes(x = (xmin + xmax) / 2, y = y_position, label = annotation),
+      vjust = 0, nudge_y = tip * 0.2, size = 6, color = "black", inherit.aes = FALSE
+    )
+}
+
+print(activity_plot)
+```
+
+## Starting the large model with each day. 
+
+Note we have dropped the last day since it only contains about 4 hours of data.
+
+```{r}
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+library(dplyr)
+library(readr)
+library(stringr)
+
+daily_dist_4d = daily_dist %>%
+  mutate(day_factor = factor(day_num)) %>%
+  filter(day_num %in% 0:3) %>%
+  droplevels()   # drops the now-unused day_factor level "4"
+
+
+# dispersion allowed to vary by phase (fixes the day/night
+# residual deviation), fit on day 0-3 data (day 4 dropped)
+full_mod3 = glmmTMB(
+  dist_per_hour ~ treatment * phase_label * day_factor + (1 | animal_id),
+  dispformula = ~ phase_label,
+  data = daily_dist_4d,
+  family = tweedie(link = "log")
+)
+
+summary(full_mod3)
+
+res3 = simulateResiduals(full_mod3, n = 500)
+plot(res3)
+testOutliers(res3)
+testQuantiles(res3)
+
+# Estimated marginal means and pairwise contrasts, computed within each day.
+# Tukey adjustment here is applied separately per day_factor level (family size = 4
+# groups -> 6 comparisons per day), not across all 4 days.
+emm_by_day = emmeans(full_mod3, ~ treatment * phase_label | day_factor, type = "response")
+pw_by_day  = pairs(emm_by_day, adjust = "tukey")
+pw_df      = as.data.frame(pw_by_day)
+
+# Classify each of the 6-per-day contrasts into the 4 comparisons we actually
+# care about (LD vs DD within a phase; day vs night within a treatment).
+# The other 2 per day (the "cross" comparisons, e.g. LD-Day vs DD-Night)
+# are kept in the saved table but not plotted.
+classify_contrast = function(x) {
+  ld_day   = str_detect(x, fixed("LD-diet Day"))
+  ld_night = str_detect(x, fixed("LD-diet Night"))
+  dd_day   = str_detect(x, fixed("DD-diet Day"))
+  dd_night = str_detect(x, fixed("DD-diet Night"))
+  case_when(
+    ld_day & dd_day     ~ "Day: LD vs DD",
+    ld_night & dd_night ~ "Night: LD vs DD",
+    ld_day & ld_night    ~ "LD: Day vs Night",
+    dd_day & dd_night    ~ "DD: Day vs Night",
+    TRUE ~ NA_character_
+  )
+}
+
+pw_df = pw_df %>% mutate(comparison_type = classify_contrast(contrast))
+
+# save the full per-day table (all 6 comparisons x 4 days) for the record
+write_csv(pw_df, file.path(tables_dir, "pairwise_glmmtmb_within_day.csv"))
+
+```
+
+
+```{r}
+library(ggplot2)
+library(purrr)
+library(tibble)
+library(dplyr)
+
+p_to_stars = function(p) {
+  case_when(
+    p < 0.0001 ~ "****",
+    p < 0.001  ~ "***",
+    p < 0.01   ~ "**",
+    p < 0.05   ~ "*",
+    TRUE       ~ "ns"
+  )
+}
+
+daily_dist_4d = daily_dist_4d %>%
+  mutate(
+    treatment = factor(treatment, levels = c("LD-diet", "DD-diet")),
+    phase_label_clean = factor(
+      phase_label,
+      levels = c("Day", "Night"),
+      labels = c("Day /\nSubjective Day", "Night /\nSubjective Night")
+    )
+  )
+
+global_max = max(daily_dist_4d$dist_per_hour, na.rm = TRUE)
+
+# build the 4 annotation brackets for a single day, using that day's own
+# box heights but margins scaled off the global max (keeps spacing
+# consistent across panels)
+build_day_brackets = function(day_lvl) {
+  d = daily_dist_4d %>% filter(day_factor == day_lvl)
+
+  get_max = function(trt, phase) {
+    vals = d$dist_per_hour[d$treatment == trt & d$phase_label == phase]
+    if (length(vals) == 0) return(0)
+    max(vals, na.rm = TRUE)
+  }
+  get_p = function(type) {
+    row = pw_df %>% filter(day_factor == day_lvl, comparison_type == type)
+    if (nrow(row) == 0) return(1)
+    row$p.value[1]
+  }
+
+  y_day   = max(get_max("LD-diet", "Day"),   get_max("DD-diet", "Day"))   + global_max * 0.05
+  y_night = max(get_max("LD-diet", "Night"), get_max("DD-diet", "Night")) + global_max * 0.05
+  base    = max(y_day, y_night)
+
+  tibble(
+    day_factor      = day_lvl,
+    comparison_type = c("Day: LD vs DD", "Night: LD vs DD", "LD: Day vs Night", "DD: Day vs Night"),
+    xmin        = c(1 - 0.1875, 2 - 0.1875, 1 - 0.1875, 1 + 0.1875),
+    xmax        = c(1 + 0.1875, 2 + 0.1875, 2 - 0.1875, 2 + 0.1875),
+    y_position  = c(y_day, y_night, base + global_max * 0.12, base + global_max * 0.20),
+    p_val       = c(get_p("Day: LD vs DD"), get_p("Night: LD vs DD"),
+                     get_p("LD: Day vs Night"), get_p("DD: Day vs Night"))
+  )
+}
+
+brackets_all = map_dfr(levels(daily_dist_4d$day_factor), build_day_brackets) %>%
+  mutate(annotation = p_to_stars(p_val)) %>%
+  filter(annotation != "ns")
+
+tip = global_max * 0.015
+
+# set brackets
+bracket_paths = brackets_all %>%
+  mutate(bracket_id = row_number()) %>%
+  pmap_dfr(function(xmin, xmax, y_position, day_factor, bracket_id, ...) {
+    tibble(
+      bracket_id = bracket_id,
+      day_factor = day_factor,
+      x = c(xmin, xmin, xmax, xmax),
+      y = c(y_position - tip, y_position, y_position, y_position - tip)
+    )
+  })
+
+activity_plot = ggplot(daily_dist_4d, aes(x = phase_label_clean, y = dist_per_hour, fill = treatment)) +
+  geom_boxplot(width = 0.5, position = position_dodge(0.75), outlier.shape = NA, alpha = 0.7, color = "black") +
+  geom_point(
+    aes(group = treatment),
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.75),
+    color = "black", alpha = 0.4, size = 1.2, stroke = 0
+  ) +
+  scale_fill_manual(values = palette_dict, labels = c("LD-diet" = "LD", "DD-diet" = "DD")) +
+  labs(x = NULL, y = "Distance Travelled (cm / hour)", fill = NULL) +
+  facet_wrap(~ day_factor, nrow = 2, labeller = as_labeller(function(x) paste0("Day ", as.integer(x) + 1))) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.12))) +
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position = "top", legend.title = element_blank(),
+    axis.text = element_text(color = "black"), axis.line = element_line(color = "black")
+  )
+
+if (nrow(brackets_all) > 0) {
+  activity_plot = activity_plot +
+    geom_path(
+      data = bracket_paths,
+      aes(x = x, y = y, group = bracket_id),
+      inherit.aes = FALSE, color = "black",
+      lineend = "butt", linejoin = "mitre"
+    ) +
+    geom_text(
+      data = brackets_all,
+      aes(x = (xmin + xmax) / 2, y = y_position, label = annotation),
+      inherit.aes = FALSE, vjust = 0, nudge_y = tip * 0.2, size = 5, color = "black"
+    )
+}
+
+print(activity_plot)
+ggsave(file.path(out_dir, "distance_rate_glmmTMB_byDay_pubReady.svg"),
+       plot = activity_plot, width = 6, height = 6)
+```
+
