@@ -11,6 +11,7 @@ dependencies = [
     "astropy>=8.0.1",
     "h5py>=3.16.0",
     "matplotlib>=3.11.1",
+    "networkx>=3.6.1",
     "opencv-python>=5.0.0.93",
     "pandas>=3.0.5",
     "pyarrow>=25.0.0",
@@ -18,6 +19,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "sleap-io>=0.7.1",
     "sleap[io,nn]>=1.6.3",
+    "statsmodels>=0.15.0",
     "tables>=3.11.1",
 ]
 
