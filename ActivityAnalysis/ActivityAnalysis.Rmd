@@ -111,6 +111,10 @@ library(emmeans)
 
 # Extract estimated marginal means on the response scale
 emm = emmeans(tweedie_mod, ~ group, type = "response")
+emm_simple_summary = summary(emm) %>% 
+  as.data.frame() %>%
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+
 
 # Calculate pairwise comparisons with Tukey correction
 pw_results = pairs(emm, adjust = "tukey")
@@ -119,7 +123,11 @@ pw_df = as.data.frame(summary(pw_results))
 summary(pw_results)
 
 # Save to disc
-write_csv(as.data.frame(summary(pw_results)), file.path(tables_dir, "pairwise_glmmtmb_fdr_averaged.csv"))
+write_csv(as.data.frame(summary(pw_results)), file.path(tables_dir, "pairwise_glmmtmb_tukey_averaged.csv"))
+
+# write estimated marginal means to disc
+write_csv(emm_simple_summary, file.path(tables_dir, "emm_glmmtmb_averaged.csv"))
+
 ```
 
 # start the ggplot
@@ -292,6 +300,9 @@ testQuantiles(res3)
 # Tukey adjustment here is applied separately per day_factor level (family size = 4
 # groups -> 6 comparisons per day), not across all 4 days.
 emm_by_day = emmeans(full_mod3, ~ treatment * phase_label | day_factor, type = "response")
+emm_by_day_summary = summary(emm_by_day) %>% 
+  as.data.frame() %>%
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
 pw_by_day  = pairs(emm_by_day, adjust = "tukey")
 pw_df      = as.data.frame(pw_by_day)
 
@@ -317,6 +328,9 @@ pw_df = pw_df %>% mutate(comparison_type = classify_contrast(contrast))
 
 # save the full per-day table (all 6 comparisons x 4 days) for the record
 write_csv(pw_df, file.path(tables_dir, "pairwise_glmmtmb_within_day.csv"))
+
+# write the emmans table as well
+write_csv(emm_by_day_summary, file.path(tables_dir, "emm_glmmtmb_within_day.csv"))
 
 ```
 
