@@ -4,7 +4,7 @@
 
 This directory/repo contains the working scripts and tools utilized for video tracking *Rhopalosiphum padi* behaviors over time.
 
-The subdirectories found within this project repository contain notes, analyses, etc. Each should include a README with some information on the analysis, the environment/packages used, etc.
+The subdirectories found within this project repository contain notes, analyses, etc. More information on each analysis (i.e., the environment/packages used, etc.) can be found in each subdirectory in the README or Python notebook files.
 
 ## Package Management
 
