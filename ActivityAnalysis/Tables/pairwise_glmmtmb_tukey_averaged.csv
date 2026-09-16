@@ -1,0 +1,7 @@
+contrast,ratio,SE,df,null,z.ratio,p.value
+(DD-diet_Day) / (DD-diet_Night),1.26,0.13,Inf,1,2.17,0.13
+(DD-diet_Day) / (LD-diet_Day),0.52,0.05,Inf,1,-6.62,2.09E-10
+(DD-diet_Day) / (LD-diet_Night),0.95,0.11,Inf,1,-0.48,0.96
+(DD-diet_Night) / (LD-diet_Day),0.41,0.04,Inf,1,-8.19,4.87E-14
+(DD-diet_Night) / (LD-diet_Night),0.75,0.09,Inf,1,-2.37,0.08
+(LD-diet_Day) / (LD-diet_Night),1.83,0.20,Inf,1,5.49,2.45E-07

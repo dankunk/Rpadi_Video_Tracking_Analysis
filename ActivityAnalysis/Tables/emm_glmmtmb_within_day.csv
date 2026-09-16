@@ -1,0 +1,17 @@
+treatment,phase_label,day_factor,response,SE,df,asymp.LCL,asymp.UCL
+LD-diet,Day,0,183.68,23.1,Inf,143.56,235.01
+DD-diet,Day,0,121.33,15.86,Inf,93.9,156.76
+LD-diet,Night,0,137.72,21.24,Inf,101.79,186.32
+DD-diet,Night,0,72.87,11.71,Inf,53.18,99.86
+LD-diet,Day,1,179.73,23.43,Inf,139.21,232.04
+DD-diet,Day,1,49.65,7.22,Inf,37.33,66.03
+LD-diet,Night,1,87.07,14.76,Inf,62.46,121.39
+DD-diet,Night,1,43.16,7.68,Inf,30.45,61.17
+LD-diet,Day,2,122.88,17.91,Inf,92.34,163.52
+DD-diet,Day,2,58.03,8.83,Inf,43.07,78.2
+LD-diet,Night,2,21.96,4.87,Inf,14.22,33.92
+DD-diet,Night,2,59.59,10.69,Inf,41.93,84.7
+LD-diet,Day,3,76.1,13.5,Inf,53.76,107.73
+DD-diet,Day,3,78.34,11.76,Inf,58.37,105.14
+LD-diet,Night,3,24.16,6.38,Inf,14.4,40.53
+DD-diet,Night,3,61.13,11.26,Inf,42.61,87.69
