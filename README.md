@@ -45,6 +45,12 @@ uv add --dev ipykernel
 
 Its a good idea to restart vs code...
 
-Now we should be able to grab the kernel in the GUI... If not, go to the command palette and select the correct python interpreter that we just installed with uv...
+Now, to use the virtual environment, we can select a kernel in the top right side of any jupyter notebooks and choose the python environment associated with this directory. 
+
+Additionally, while uv should activate in our terminal automatically. If it doesn't, or if we want to use this environemnt in a different directory, we can additionally activate our venv by entering the directory of intereset and providing the path to our environment.
+
+```powershell
+. "C:\Users\nalamlab\OneDrive - Colostate\NIFA_PROJECT\Obj2\Rpadi_Video_Tracking_Analysis\.venv\Scripts\activate.ps1"
+```
 
 
