@@ -13,7 +13,7 @@ dependencies = [
     "matplotlib>=3.11.1",
     "networkx>=3.6.1",
     "opencv-python>=5.0.0.93",
-    "pandas>=3.0.5",
+    "pandas==3.0.5",
     "pyarrow>=25.0.0",
     "scipy>=1.18.0",
     "seaborn>=0.13.2",
