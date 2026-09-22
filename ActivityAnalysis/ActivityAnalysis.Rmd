@@ -450,3 +450,68 @@ ggsave(file.path(out_dir, "distance_rate_glmmTMB_byDay_pubReady.svg"),
        plot = activity_plot, width = 6, height = 6)
 ```
 
+
+### New test w/ batch effect (replicate...), should we include it in the model?
+
+
+```{r}
+# load packages; be sure to run the first code chunk were we load the df
+library(glmmTMB)
+library(dplyr)
+library(performance)
+
+# prepping data to include batch_id
+# and fix the animal_id collision, also keeping days 0-3 as above...
+daily_dist_4d_nested = df %>%
+  mutate(
+    # Create the unique batch identifier
+    batch_id = factor(paste(treatment, replicate, sep = "_")),
+    # Create truly unique animal identifier using the batch
+    animal_id = factor(paste(batch_id, "Ind", individual, sep = "_"))
+  ) %>%
+  filter(day_num %in% 0:3) %>%
+  group_by(treatment, batch_id, animal_id, day_num, is_photophase) %>%
+  summarise(
+    distance_cm = sum(distance_cm, na.rm = TRUE),
+    observed_minutes = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    duration_hours = observed_minutes / 60,
+    dist_per_hour = distance_cm / duration_hours,
+    phase_label = if_else(is_photophase, "Day", "Night"),
+    day_factor = factor(day_num),
+    treatment = factor(treatment, levels = c("LD-diet", "DD-diet"))
+  )
+
+# old model from above
+mod_old = glmmTMB(
+  dist_per_hour ~ treatment * phase_label * day_factor + (1 | animal_id),
+  dispformula = ~ phase_label,
+  data = daily_dist_4d_nested,
+  family = tweedie(link = "log")
+)
+
+# new model with nested batch effects
+mod_new = glmmTMB(
+  dist_per_hour ~ treatment * phase_label * day_factor + (1 | batch_id) + (1 | animal_id),
+  dispformula = ~ phase_label,
+  data = daily_dist_4d_nested,
+  family = tweedie(link = "log")
+)
+
+# compare the models
+cat("--- Model Comparison (AIC / BIC / R2) ---\n")
+model_comp = compare_performance(mod_old, mod_new)
+print(model_comp)
+
+cat("\n--- Likelihood Ratio Test ---\n")
+# liklihood ratio test (anova)
+print(anova(mod_old, mod_new))
+
+# grab ICC between models
+cat("\n--- Variance Partitioning (ICC) for the Nested Model ---\n")
+icc_results = icc(mod_new, by_group = TRUE)
+print(icc_results)
+```
+
